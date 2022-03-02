@@ -1,6 +1,4 @@
-from turtle import pos
 import cv2
-import numpy as np
 from face_tracking import FaceTracking
 from pose_estimation import PoseEstimation
 
