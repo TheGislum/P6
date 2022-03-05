@@ -37,7 +37,7 @@ class FaceTracking:
             frame (numpy.ndarray): The frame to analyze
         """
         self.frame = frame
-        self._analyze()
+        return self._analyze()
 
     def _analyze(self):
         """Detects the face and landmarks"""
@@ -46,13 +46,14 @@ class FaceTracking:
         try:
             self.landmarks = self._predictor(frame, self.faces[0])
         except IndexError:
-            i = None
-            #TODO handle exception
+            return False
+        return True
 
     def draw_landmarks(self, frame):
-        for i in range(self.landmarks.num_parts):
-                        p = self.landmarks.part(i)
-                        cv2.circle(frame, (p.x, p.y), 1, 255, 2)
+        if self.landmarks != None:
+            for i in range(self.landmarks.num_parts):
+                            p = self.landmarks.part(i)
+                            cv2.circle(frame, (p.x, p.y), 1, 255, 2)
 
     def draw_face_squares(self, frame):
         for f in self.faces:

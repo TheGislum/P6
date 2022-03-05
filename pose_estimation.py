@@ -181,13 +181,14 @@ class PoseEstimation:
             self.yaw = 90
 
     def draw_facing(self, frame):
-        p1, p2, x1, x2 = self.lines
+        if self.face_landmarks != None:
+            p1, p2, x1, x2 = self.lines
 
-        for p in self._image_points:
-            cv2.circle(frame, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
-        
-        cv2.line(frame, p1, p2, (0, 255, 255), 2)
-        cv2.line(frame, tuple(x1), tuple(x2), (255, 255, 0), 2)
+            for p in self._image_points:
+                cv2.circle(frame, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
+            
+            cv2.line(frame, p1, p2, (0, 255, 255), 2)
+            cv2.line(frame, tuple(x1), tuple(x2), (255, 255, 0), 2)
 
     def write_position_on_frame(self, frame):
         cv2.putText(frame, "Pitch:  " + str(self.pitch), (45, 30), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)

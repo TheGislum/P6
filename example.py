@@ -1,6 +1,7 @@
 import cv2
 from face_tracking import FaceTracking
 from pose_estimation import PoseEstimation
+from eye_isolation import EyeIsolation
 
 webcam = cv2.VideoCapture(0)
 ret, img = webcam.read()
@@ -12,12 +13,17 @@ while True:
     # We get a new frame from the webcam
     ret, frame = webcam.read()
     if ret == True:
-        face.refresh(frame)
+        if face.refresh(frame):
+            pose.refresh(frame, face.landmarks)
+            eye_left = EyeIsolation(frame, pose.face_landmarks, 0)
+            eye_right = EyeIsolation(frame, pose.face_landmarks, 1)
+            
         face.draw_face_squares(frame)
         face.draw_landmarks(frame)
-        pose.refresh(frame, face.landmarks)
+
         pose.draw_facing(frame)
         pose.write_position_on_frame(frame)
+
     cv2.imshow("Demo", frame)
 
     if cv2.waitKey(1) == 27:
@@ -25,3 +31,6 @@ while True:
    
 webcam.release()
 cv2.destroyAllWindows()
+
+#https://github.com/vardanagarwal/Proctoring-AI
+#https://learnopencv.com/head-pose-estimation-using-opencv-and-dlib/
