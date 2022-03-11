@@ -17,6 +17,7 @@ while True:
             pose.refresh(frame, face.landmarks)
             eye_left = EyeIsolation(frame, pose.face_landmarks, 0)
             eye_right = EyeIsolation(frame, pose.face_landmarks, 1)
+            #cv2.imshow("eye_left", eye_left.colour_frame)
             
         face.draw_face_squares(frame)
         face.draw_landmarks(frame)

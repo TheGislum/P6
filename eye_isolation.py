@@ -58,6 +58,7 @@ class EyeIsolation(object):
         max_y = np.max(region[:, 1]) + margin
 
         self.frame = eye[min_y:max_y, min_x:max_x]
+        self.colour_frame = frame[min_y:max_y, min_x:max_x]
         self.origin = (min_x, min_y)
 
         height, width = self.frame.shape[:2]
