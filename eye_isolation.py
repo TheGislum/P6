@@ -11,11 +11,12 @@ class EyeIsolation(object):
     LEFT_EYE_POINTS = [36, 37, 38, 39, 40, 41]
     RIGHT_EYE_POINTS = [42, 43, 44, 45, 46, 47]
 
-    def __init__(self, original_frame, landmarks, side):
+    def __init__(self, original_frame, landmarks, side, resolution=None):
         self.frame = None
         self.origin = None
         self.center = None
         self.landmark_points = None
+        self._resolution = resolution
 
         self._analyze(original_frame, landmarks, side)
 
@@ -51,11 +52,7 @@ class EyeIsolation(object):
         eye = cv2.bitwise_not(black_frame, frame.copy(), mask=mask)
 
         # Cropping on the eye
-        margin = 5
-        min_x = np.min(region[:, 0]) - margin
-        max_x = np.max(region[:, 0]) + margin
-        min_y = np.min(region[:, 1]) - margin
-        max_y = np.max(region[:, 1]) + margin
+        min_x, max_x, min_y, max_y = self._crop(region, 5)
 
         self.frame = eye[min_y:max_y, min_x:max_x]
         self.colour_frame = frame[min_y:max_y, min_x:max_x]
@@ -63,6 +60,23 @@ class EyeIsolation(object):
 
         height, width = self.frame.shape[:2]
         self.center = (width / 2, height / 2)
+
+    def _crop(self, region, margin): # migth led to crash if margin is out of picture
+        min_x = np.min(region[:, 0]) - margin
+        max_x = np.max(region[:, 0]) + margin
+        min_y = np.min(region[:, 1]) - margin
+        max_y = np.max(region[:, 1]) + margin
+        
+        if self._resolution != None:
+            pX, pY = (max_x - min_x), (max_y - min_y)
+            dX, dY = (self._resolution[0] - pX)/2, (self._resolution[1] - pY)/2
+            min_x = min_x - math.floor(dX)
+            max_x = max_x + math.ceil(dX)
+            min_y = min_y - math.floor(dY)
+            max_y = max_y + math.ceil(dY)
+
+        return min_x, max_x, min_y, max_y
+
 
     def _blinking_ratio(self, landmarks, points):
         """Calculates a ratio that can indicate whether an eye is closed or not.

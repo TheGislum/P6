@@ -1,53 +1,97 @@
-import cv2
 import torch
 import numpy as np
-from gaze_model import model
+from torch import nn, optim
+from gaze_model import annet
+from eye_dataset import eyeDataset
+from torchvision import transforms
+from torch.utils.data import DataLoader
+from torch.utils.data import random_split
 
-EPOCHS = 5
-BATCH_SIZE = 64
-WEIGHT_DECAY = 0.0001
-LEARNING_RATE = 0.001
-PRINT_EVERY = 1000
-SAVE = './garage/metr'
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+def main():
+    EPOCHS = 50
+    BATCH_SIZE = 64
+    WEIGHT_DECAY = 0.001
+    LEARNING_RATE = 0.0001
+    PRINT_EVERY = 64
+    SAVE = './garage/metr'
+    dataset_dir = './eye_dataset'
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# TODO load a dataset with the right formatting
-image_set = torch.load
+    net = annet(device=device)
 
-trainloader = torch.utils.data.DataLoader(image_set, BATCH_SIZE, shuffle=True, num_workers=2)
+    img_transform = transforms.Compose([
+            transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15, hue=0.15),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+    dataset = eyeDataset(dataset_dir + "/eye_dataset.csv", dataset_dir, img_transform, True, False)
 
-optimizer = torch.optim.Adam(model.parameters(), LEARNING_RATE, WEIGHT_DECAY)
-criterion = torch.nn.MSELoss()
-train_loss = []
+    train_set, test_set = random_split(dataset, [int(len(dataset)*0.8), int(len(dataset)-(int(len(dataset)*0.8)))])
 
-print("start training...", flush=True)
+    train_loader = DataLoader(train_set, BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True)
+    test_loader = DataLoader(test_set, BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True)
 
-for epoch in range(EPOCHS):  # loop over the dataset multiple times
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    criterion = nn.MSELoss()
+    train_loss = []
 
-    running_loss = 0.0
-    for i, data in enumerate(trainloader, 0):
-        # get the inputs; data is a list of [inputs, labels]
-        inputs, labels = data
+    print("start training...", flush=True)
 
-        # zero the parameter gradients
-        optimizer.zero_grad()
+    for epoch in range(EPOCHS):  # loop over the dataset multiple times
 
-        # forward + backward + optimize
-        outputs = model.preprocess_image(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+        running_loss = 0.0
+        for i, data in enumerate(train_loader, 0):
+            # get the inputs; data is a list of [inputs, labels]
+            inputs, labels = data
+            inputs = inputs.to(device)
+            labels = labels.to(device)
 
-        train_loss.append(loss)
+            # zero the parameter gradients
+            optimizer.zero_grad()
 
-        # print statistics
-        running_loss += loss.item()
-        if i % PRINT_EVERY == 0:    # print every 2000 mini-batches
-            print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / PRINT_EVERY:.3f}')
-            running_loss = 0.0
+            # forward + backward + optimize
+            outputs = net(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
-torch.save(model.state_dict(), SAVE + "_epoch_" + str(EPOCHS) + "_" + str(round(np.mean(train_loss), 6)) + ".pth")
+            train_loss.append(loss.item())
 
-print('Finished Training')
+            # print statistics
+            running_loss += loss.item()
+            if i % PRINT_EVERY == 0:    # print every PRINT_EVERY mini-batches
+                print(f'[{epoch + 1}, {i + 1:5d}] loss: {np.mean(train_loss[-PRINT_EVERY:]):.3f}')
+                running_loss = 0.0
+
+    torch.save(net.state_dict(), SAVE + "_epoch_" + str(EPOCHS) + "_" + str(round(np.mean(train_loss), 6)) + ".pth")
+
+    print("Finished Training - loss: {:.4f}".format(np.mean(train_loss)))
+    print("start testing...", flush=True)
+    test_loss = []
+    for epoch in range(EPOCHS):  # loop over the dataset multiple times
+
+        running_loss = 0.0
+        with torch.no_grad():
+            for i, data in enumerate(test_loader, 0):
+                # get the inputs; data is a list of [inputs, labels]
+                inputs, labels = data
+                inputs = inputs.to(device)
+                labels = labels.to(device)
+
+                # forward + backward + optimize
+                outputs = net(inputs)
+                loss = criterion(outputs, labels)
+
+                test_loss.append(loss.item())
+
+                # print statistics
+                running_loss += loss.item()
+                if i % PRINT_EVERY == 0:    # print every PRINT_EVERY mini-batches
+                    print(f'[{epoch + 1}, {i + 1:5d}] loss: {np.mean(train_loss[-PRINT_EVERY:]):.3f}')
+                    running_loss = 0.0
+
+    print("Finished Testing - loss: {:.4f}".format(np.mean(test_loss)))
+
+if __name__ == "__main__":
+    main()
 
 # https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html#train-the-network
