@@ -1,4 +1,5 @@
 import cv2
+from numpy import eye
 import torch
 import mouse
 import ctypes
@@ -23,8 +24,8 @@ img_transform = transforms.Compose([
         ])
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-net = annet(device=device)
-net.load_state_dict(torch.load('./garage/metr_epoch_50_149304.601406.pth', map_location=device))
+net = annet(device=device, in_channels=3)
+net.load_state_dict(torch.load('./garage/left_epoch_2000_0.005099.pth', map_location=device))
 net = net.eval()
 
 while True:
@@ -33,10 +34,18 @@ while True:
     if ret == True:
         if face.refresh(frame):
             pose.refresh(frame, face.landmarks)
-            eye_left = EyeIsolation(frame, pose.face_landmarks, 0, (50, 30))
+            eye_left = EyeIsolation(frame, pose.face_landmarks, 0, (50, 30)).colour_frame
+            eye_left = torch.tensor(cv2.cvtColor(eye_left, cv2.COLOR_BGR2RGB), dtype=torch.float).permute(2,0,1)/255.0
+            eye_left = img_transform(eye_left)
             
+            # eye_right = EyeIsolation(frame, pose.face_landmarks, 1, (50, 30)).colour_frame
+            # eye_right = torch.tensor(cv2.cvtColor(eye_right, cv2.COLOR_BGR2RGB), dtype=torch.float).permute(2,0,1)/255.0
+            # eye_right = img_transform(eye_right)
+            
+            input = eye_left
+            # input = torch.cat((eye_left, eye_right), 0)
             with torch.no_grad():
-                point = net(img_transform(eye_left.colour_frame).unsqueeze(0).to(device)).squeeze(0)
+                point = net(input.unsqueeze(0).to(device)).squeeze(0)
             
             x = ((point[0].item() + 1) * (screenWidth/2))
             y = ((1 - point[1].item()) * (screenHeight/2))

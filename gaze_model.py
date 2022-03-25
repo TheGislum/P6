@@ -2,13 +2,13 @@ from torch import nn
 
 class annet(nn.Module):
 
-    def __init__(self, device):
+    def __init__(self, device, in_channels=3):
         super(annet, self).__init__()
 
         conv_model = nn.Sequential(
             #64 -> 32 BLOCK
             #CHANNEL SIZE 128
-            nn.Conv2d(3,128, 3, padding=1), #Normal convolution layer
+            nn.Conv2d(in_channels,128, 3, padding=1), #Normal convolution layer
             nn.ReLU(inplace=True),
             nn.Conv2d(128,128, 3, padding=1), #Normal convolution layer
             nn.ReLU(inplace=True),

@@ -31,7 +31,7 @@ class eyeDataset(Dataset):
                 right_eye_img = self.transform(right_eye_img)
 
         if self.left_eye and self.right_eye:
-            img = torch.stack((left_eye_img, right_eye_img),0)
+            img = torch.cat((left_eye_img, right_eye_img),0)
         elif self.right_eye:
             img = right_eye_img
         elif self.left_eye:

@@ -8,7 +8,8 @@ from pose_estimation import PoseEstimation
 from eye_isolation import EyeIsolation
 
 dataset_dir = "./eye_dataset/"
-dataset = pd.read_csv(dataset_dir + "./eye_dataset.csv")
+csv_path = dataset_dir + "/dataset2.csv"
+dataset = pd.read_csv(csv_path)
 
 webcam = cv2.VideoCapture(0)
 ret, img = webcam.read()
@@ -16,7 +17,7 @@ ret, img = webcam.read()
 face = FaceTracking()
 pose = PoseEstimation(img)
 
-step = 100
+step = 75
 user32 = ctypes.windll.user32
 screenWidth, screenHeight = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1) # get monitor resolution
 #screenWidth, screenHeight = user32.GetSystemMetrics(78), user32.GetSystemMetrics(79) # get multi monitor resolution (all monitors)
@@ -59,13 +60,13 @@ for i in range(step, screenWidth-step, step):
                         left_eye_path = "left_eye" + str(row) + ".png"
                         right_eye_path = "right_eye" + str(row) + ".png"
 
-                        cv2.imwrite(dataset_dir + left_eye_path, left_eye.colour_frame)
-                        cv2.imwrite(dataset_dir + right_eye_path, right_eye.colour_frame)
+                        cv2.imwrite(dataset_dir + "dataset2/" + left_eye_path, left_eye.colour_frame)
+                        cv2.imwrite(dataset_dir + "dataset2/" + right_eye_path, right_eye.colour_frame)
 
                         dataset = pd.concat([dataset, pd.DataFrame({'left_eye': [left_eye_path], 'right_eye': [right_eye_path], 'x': [x], 'y': [y]}, columns=dataset.columns)])
    
 webcam.release()
-dataset.to_csv(dataset_dir + "eye_dataset.csv", index = False, header = True, mode = 'w')
+dataset.to_csv(csv_path, index = False, header = True, mode = 'w')
 
 #https://github.com/boppreh/mouse
 
