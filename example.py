@@ -15,9 +15,11 @@ while True:
     if ret == True:
         if face.refresh(frame):
             pose.refresh(frame, face.lastXLandmarksAverage)
-            eye_left = EyeIsolation(frame, pose.face_landmarks, 0)
-            eye_right = EyeIsolation(frame, pose.face_landmarks, 1)
-            #cv2.imshow("eye_left", eye_left.colour_frame)
+            eye_left = EyeIsolation(frame, pose.face_landmarks, 0, (50, 30))
+            eye_right = EyeIsolation(frame, pose.face_landmarks, 1, (50, 30))
+            cv2.imshow("eye_left", eye_left.colour_frame)
+            #cv2.putText(frame, str(((eye_left.blinking + eye_right.blinking) / 2)), (45, 90), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)
+            cv2.putText(frame, str((eye_left.colour_frame.shape)), (45, 90), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)
             
         face.draw_face_squares(frame)
         face.draw_landmarks(frame)
