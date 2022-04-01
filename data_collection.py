@@ -21,7 +21,8 @@ stop = False
 j = 0
 startX, startY = 40, 20
 
-img_list = []
+left_eye_list = []
+right_eye_list = []
 lable_list = []
 
 mouse.move(startX, startY)
@@ -54,15 +55,15 @@ for i in range(startX, (screenWidth - startX) + step, step):
                     left_eye = EyeIsolation(frame, face.landmarks, 0, (50, 30)).colour_frame
                     right_eye = EyeIsolation(frame, face.landmarks, 1, (50, 30)).colour_frame
 
-                    left_eye = torch.tensor(cv2.cvtColor(left_eye, cv2.COLOR_BGR2RGB)).permute(2,0,1)
-                    right_eye = torch.tensor(cv2.cvtColor(right_eye, cv2.COLOR_BGR2RGB)).permute(2,0,1)
+                    left_eye_list.append(torch.tensor(cv2.cvtColor(left_eye, cv2.COLOR_BGR2RGB)).permute(2,0,1))
+                    right_eye_list.append(torch.tensor(cv2.cvtColor(right_eye, cv2.COLOR_BGR2RGB)).permute(2,0,1))
 
-                    img_list.append(torch.cat((left_eye, right_eye), 0))
                     lable_list.append(posistion)
 
-img_list = torch.stack(img_list, 0) 
+left_eye_list = torch.stack(left_eye_list, 0)
+right_eye_list = torch.stack(right_eye_list, 0)
 lable_list = torch.stack(lable_list, 0)
-torch.save({"eyes":img_list, "lables":lable_list}, dataset_dir + "dataset_partx.pt")          
+torch.save({"left_eye":left_eye_list, "right_eye":right_eye_list, "lables":lable_list}, dataset_dir + "dataset_partx.pt")          
    
 webcam.release()
 
