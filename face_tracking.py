@@ -9,6 +9,8 @@ class FaceTracking:
         self.frame = None
         self.faces = None
         self.landmarks = None
+        self.lastXLandmarks = dlib.full_object_detections()
+        self.lastXLandmarksAverage = None
 
         # _face_detector is used to detect faces
         self._face_detector = dlib.get_frontal_face_detector()
@@ -17,17 +19,6 @@ class FaceTracking:
         cwd = os.path.abspath(os.path.dirname(__file__))
         model_path = os.path.abspath(os.path.join(cwd, "trained_models/shape_predictor_68_face_landmarks.dat"))
         self._predictor = dlib.shape_predictor(model_path)
-
-    #TODO make this work
-    @property
-    def smooth_landmark_points(self):
-        return np.mean(self.smooth_landmark_points)
-
-    @smooth_landmark_points.setter
-    def smooth_landmark_points(self, new_landmarks):
-        self.smooth_landmark_points.appende(new_landmarks)
-        if len(self.smooth_landmark_points) > 5:
-            self.smooth_landmark_points.remove(5)
 
 
     def refresh(self, frame):
@@ -45,15 +36,54 @@ class FaceTracking:
         self.faces = self._face_detector(frame)
         try:
             self.landmarks = self._predictor(frame, self.faces[0])
+            if self.lastXLandmarks.__len__() >= 5:
+                self.lastXLandmarks.pop(0)
+            self.lastXLandmarks.append(self.landmarks)
+            self.calculateAverageLandmark()
         except IndexError:
             return False
         return True
 
+    def calculateAverageLandmark(self):
+        if self.landmarks != None:
+            i = 0
+            rl, rr, rt, rb = 0, 0, 0, 0
+            parts = dlib.points()
+            for landmarks in self.lastXLandmarks:
+                i = i + 1
+                rl, rr, rt, rb = rl + landmarks.rect.left(), \
+                                 rr + landmarks.rect.right(), \
+                                 rt + landmarks.rect.top(), \
+                                 rb + landmarks.rect.bottom()
+                if i == 1:
+                    for j in range(landmarks.num_parts):
+                        parts.append(landmarks.part(j))
+                else:
+                    for j in range(landmarks.num_parts):
+                        part = parts.pop(0)
+                        new_part = dlib.point(part.x + landmarks.part(j).x, part.y + landmarks.part(j).y)
+                        parts.append(new_part)
+
+            rl, rr, rt, rb = int(rl / i), int(rr / i), int(rt / i), int(rb / i)
+            rect = dlib.rectangle(rl, rt, rr, rb)
+
+            for j in range(self.landmarks.num_parts):
+                part = parts.pop(0)
+                new_part = dlib.point(int(part.x / i), int(part.y / i))
+                parts.append(new_part)
+
+            self.lastXLandmarksAverage = dlib.full_object_detection(rect, parts)
+
     def draw_landmarks(self, frame):
         if self.landmarks != None:
             for i in range(self.landmarks.num_parts):
-                            p = self.landmarks.part(i)
-                            cv2.circle(frame, (p.x, p.y), 1, 255, 2)
+                p = self.landmarks.part(i)
+                cv2.circle(frame, (p.x, p.y), 1, 255, 2)
+
+        if self.lastXLandmarksAverage != None:
+            for i in range(self.lastXLandmarksAverage.num_parts):
+                p = self.lastXLandmarksAverage.part(i)
+                cv2.circle(frame, (p.x, p.y), 1, 0, 2)
 
     def draw_face_squares(self, frame):
         for f in self.faces:

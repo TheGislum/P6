@@ -25,6 +25,10 @@ class PoseEstimation:
         self._image_points = None
         self.lines = None
         self.frame = frame
+        self.tpitch = None
+        self.tyaw = None
+        self.updatelimit = 5
+        self.currentupdate = 5
 
         size = frame.shape
         focal_length = size[1]
@@ -156,40 +160,79 @@ class PoseEstimation:
         self._image_points = np.array([(self.face_landmarks.part(i).x, self.face_landmarks.part(i).y) for i in self.FACE_POINTS ], dtype="double")
         dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
         (success, rotation_vector, translation_vector) = cv2.solvePnP(self.MODEL_POINTS, self._image_points, self.camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_UPNP)
-        
+
         # Project a 3D point (0, 0, 1000.0) onto the image plane.
         # We use this to draw a line sticking out of the nose
-        
-        (nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 1000.0)]), rotation_vector, translation_vector, self.camera_matrix, dist_coeffs)
-        
-        p1 = ( int(self._image_points[0][0]), int(self._image_points[0][1]))
-        p2 = ( int(nose_end_point2D[0][0][0]), int(nose_end_point2D[0][0][1]))
-        x1, x2 = self._head_pose_points(self.frame, rotation_vector, translation_vector, self.camera_matrix)
 
-        self.lines = p1, p2, x1, x2
+        #(nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 1000.0)]), rotation_vector, translation_vector, self.camera_matrix, dist_coeffs)
 
-        try:
-            m = (p2[1] - p1[1])/(p2[0] - p1[0])
-            self.pitch = int(math.degrees(math.atan(m)))
-        except:
-            self.pitch = 90
-            
-        try:
-            m = (x2[1] - x1[1])/(x2[0] - x1[0])
-            self.yaw = int(math.degrees(math.atan(-1/m)))
-        except:
-            self.yaw = 90
+        axis = np.float32([[500, 0, 0],
+                           [0, 500, 0],
+                           [0, 0, 500]])
+        (nose_end_point2D, jacobian) = cv2.projectPoints(axis, rotation_vector,
+                                                         translation_vector, self.camera_matrix, dist_coeffs)
+
+
+        rvec_matrix = cv2.Rodrigues(rotation_vector)[0]
+
+        proj_matrix = np.hstack((rvec_matrix, translation_vector))
+        eulerAngles = cv2.decomposeProjectionMatrix(proj_matrix)[6]
+
+        pitch, yaw, roll = [math.radians(_) for _ in eulerAngles]
+
+        #p1 = ( int(self._image_points[0][0]), int(self._image_points[0][1]))
+        #p2 = ( int(nose_end_point2D[0][0][0]), int(nose_end_point2D[0][0][1]))
+        #x1, x2 = self._head_pose_points(self.frame, rotation_vector, translation_vector, self.camera_matrix)
+
+        nose = ( int(self._image_points[0][0]), int(self._image_points[0][1]))
+        l1 = (int(nose_end_point2D[0][0][0]), int(nose_end_point2D[0][0][1]))
+        l2 = (int(nose_end_point2D[1][0][0]), int(nose_end_point2D[1][0][1]))
+        l3 = (int(nose_end_point2D[2][0][0]), int(nose_end_point2D[2][0][1]))
+
+        #self.lines = p1, p2, x1, x2
+
+        self.lines = nose, l1, l2, l3
+
+        if self.currentupdate >= self.updatelimit:
+            try:
+                #m = (p2[1] - p1[1])/(p2[0] - p1[0])
+                #self.tpitch = int(math.degrees(math.atan(m)))
+                self.pitch = math.degrees(math.asin(math.sin(pitch)))
+            except:
+                self.pitch = 90
+                self.tpitch = 90
+
+            try:
+                #m = (x2[1] - x1[1])/(x2[0] - x1[0])
+                #self.tyaw = int(math.degrees(math.atan(-1/m)))
+                self.yaw = math.degrees(math.asin(math.sin(yaw)))
+            except:
+                self.yaw = 90
+                self.tyaw = 90
+
+            try:
+                self.roll = math.degrees(math.asin(math.sin(roll)))
+            except:
+                self.roll = 0
+
+            self.currentupdate = 0
+        self.currentupdate = self.currentupdate + 1
 
     def draw_facing(self, frame):
         if self.face_landmarks != None:
-            p1, p2, x1, x2 = self.lines
+            #p1, p2, x1, x2 = self.lines
+            nose, l1, l2, l3 = self.lines
 
             for p in self._image_points:
                 cv2.circle(frame, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
             
-            cv2.line(frame, p1, p2, (0, 255, 255), 2)
-            cv2.line(frame, tuple(x1), tuple(x2), (255, 255, 0), 2)
+            #cv2.line(frame, p1, p2, (0, 255, 255), 2)
+            #cv2.line(frame, tuple(x1), tuple(x2), (255, 255, 0), 2)
+            cv2.line(frame, nose, l1, (0, 255, 0), 3)  # GREEN
+            cv2.line(frame, nose, l2, (255, 0,), 3)  # BLUE
+            cv2.line(frame, nose, l3, (0, 0, 255), 3)  # RED
 
     def write_position_on_frame(self, frame):
         cv2.putText(frame, "Pitch:  " + str(self.pitch), (45, 30), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)
         cv2.putText(frame, "Yaw: " + str(self.yaw), (45, 65), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)
+        cv2.putText(frame, "Roll: " + str(self.roll), (45, 100), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)
