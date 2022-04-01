@@ -46,12 +46,15 @@ for i in range(startX, (screenWidth - startX) + step, step):
             stop = True
         if stop:
             break
+        
+        collected = 0
 
-        for p in range(5):
+        while collected <= 3:
             # We get a new frame from the webcam
             ret, frame = webcam.read()
             if ret == True:
                 if face.refresh(frame):
+                    collected += 1
                     left_eye = EyeIsolation(frame, face.landmarks, 0, (50, 30)).colour_frame
                     right_eye = EyeIsolation(frame, face.landmarks, 1, (50, 30)).colour_frame
 
