@@ -1,6 +1,10 @@
 #custom
 eye_dataset
 garage
+trained_models/shape_predictor_5_face_landmarks.dat
+trained_models/mmod_human_face_detector.dat
+zlib
+test.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

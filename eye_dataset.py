@@ -1,28 +1,32 @@
 import os
-import cv2
 import torch
-import pandas as pd
 from torch.utils.data import Dataset
 
 class eyeDataset(Dataset):
-    def __init__(self, csv_file, root_dir, transform=None, left_eye=True, right_eye=False):
-        self.annotations = pd.read_csv(csv_file)
-        self.root_dir = root_dir
+    def __init__(self, root_dir, transform=None, use_left_eye=True, use_right_eye=True):
         self.transform = transform
-        self.left_eye = left_eye
-        self.right_eye = right_eye
+        self.left_eye = use_left_eye
+        self.right_eye = use_right_eye
+        self.eyes = None
+        self.lables = None
+
+        for file in os.listdir(root_dir):
+            if 'dataset_part' in file and '.pt' in file:
+                dataset = torch.load(os.path.join(root_dir, file))
+                if self.eyes is None:
+                    self.eyes = dataset["eyes"]
+                    self.lables = dataset["lables"]
+                else:
+                    self.eyes = torch.cat((self.eyes, dataset["eyes"]), 0)
+                    self.lables = torch.cat((self.lables, dataset["lables"]), 0)
+
 
     def __len__(self):
-        return len(self.annotations)
+        return len(self.eyes)
 
     def __getitem__(self, index):
-        if self.left_eye:
-            left_eye_img_path = os.path.join(self.root_dir, self.annotations.iloc[index, 0])
-            left_eye_img = torch.tensor(cv2.cvtColor(cv2.imread(left_eye_img_path), cv2.COLOR_BGR2RGB), dtype=torch.float).permute(2,0,1)/255.0
-
-        if self.right_eye:
-            right_eye_img_path = os.path.join(self.root_dir, self.annotations.iloc[index, 1])
-            right_eye_img = torch.tensor(cv2.cvtColor(cv2.imread(right_eye_img_path), cv2.COLOR_BGR2RGB), dtype=torch.float).permute(2,0,1)/255.0
+        concatenated_eyes = self.eyes[index]/255
+        left_eye_img, right_eye_img = concatenated_eyes.chunk(2,0)
 
         if self.transform is not None:
             if self.left_eye:
@@ -39,6 +43,6 @@ class eyeDataset(Dataset):
         else:
             img = None
 
-        lable = torch.tensor([self.annotations.iloc[index, 2], self.annotations.iloc[index, 3]], dtype=torch.float) #TODO how to combine?
+        lable = self.lables[index]
 
         return (img, lable)
