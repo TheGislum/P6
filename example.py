@@ -14,7 +14,7 @@ while True:
     ret, frame = webcam.read()
     if ret == True:
         if face.refresh(frame):
-            pose.refresh(frame, face.landmarks)
+            pose.refresh(frame, face.lastXLandmarksAverage)
             eye_left = EyeIsolation(frame, pose.face_landmarks, 0)
             eye_right = EyeIsolation(frame, pose.face_landmarks, 1)
             #cv2.imshow("eye_left", eye_left.colour_frame)
