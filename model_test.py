@@ -38,12 +38,12 @@ while True:
             eye_left = torch.tensor(cv2.cvtColor(eye_left, cv2.COLOR_BGR2RGB), dtype=torch.float).permute(2,0,1)/255.0
             eye_left = img_transform(eye_left)
             
-            # eye_right = EyeIsolation(frame, pose.face_landmarks, 1, (50, 30)).colour_frame
-            # eye_right = torch.tensor(cv2.cvtColor(eye_right, cv2.COLOR_BGR2RGB), dtype=torch.float).permute(2,0,1)/255.0
-            # eye_right = img_transform(eye_right)
+            eye_right = EyeIsolation(frame, pose.face_landmarks, 1, (50, 30)).colour_frame
+            eye_right = torch.tensor(cv2.cvtColor(eye_right, cv2.COLOR_BGR2RGB), dtype=torch.float).permute(2,0,1)/255.0
+            eye_right = img_transform(eye_right)
             
-            input = eye_left
-            # input = torch.cat((eye_left, eye_right), 0)
+            # input = eye_left
+            input = torch.cat((eye_left, eye_right), 0)
             with torch.no_grad():
                 point = net(input.unsqueeze(0).to(device)).squeeze(0)
             
