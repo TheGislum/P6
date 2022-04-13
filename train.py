@@ -1,33 +1,38 @@
 import torch
 import numpy as np
 from torch import nn, optim
-from gaze_model import annet
+from gaze_model import annetV2
 from eye_dataset import eyeDataset
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
 
 def main():
-    EPOCHS = 1000
+    EPOCHS = 20
     BATCH_SIZE = 64
-    WEIGHT_DECAY = 0.001
+    WEIGHT_DECAY = 0.00
     LEARNING_RATE = 0.0001
-    PRINT_EVERY = 64
-    SAVE = './garage/both'
+    PRINT_EVERY = 1024
+    SAVE = './garage/both_synt_test'
     dataset_dir = './eye_dataset/'
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net = annet(device=device, in_channels=6)
+    net = annetV2(device=device, in_channels=2)
     #net.load_state_dict(torch.load('./garage/metr_epoch_1000_0.005517.pth', map_location=device))
 
-    img_transform = transforms.Compose([
-            transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15, hue=0.15),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    img_transform = transforms.Compose([ # bw transform
+            transforms.ColorJitter(brightness=0.3, contrast=0.3),
         ])
-    dataset = eyeDataset(dataset_dir + "dataset2.csv", dataset_dir + "dataset2", img_transform, True, True)
+    # img_transform = transforms.Compose([ # rgb transform
+    #         transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.15),
+    #         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    #     ])
+    dataset = eyeDataset(dataset_dir, img_transform, True, True)
     
     train_split = 0.9
     train_set, test_set = random_split(dataset, [int(len(dataset)*train_split), int(len(dataset)-(int(len(dataset)*train_split)))])
+    print("train_set: " + str(len(train_set)))
+    print("test_set: " + str(len(test_set)))
 
     train_loader = DataLoader(train_set, BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True)
     test_loader = DataLoader(test_set, BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True)
@@ -64,7 +69,7 @@ def main():
                 print(f'[{epoch + 1}, {i + 1:3d}] loss: {np.mean(train_loss[-PRINT_EVERY:]):.6f}')
                 running_loss = 0.0
 
-    torch.save(net.state_dict(), SAVE + "_epoch_" + str(0+EPOCHS) + "_" + str(round(np.mean(train_loss), 6)) + ".pth")
+    #torch.save(net.state_dict(), SAVE + "_epoch_" + str(0+EPOCHS) + "_" + str(round(np.mean(train_loss), 6)) + ".pth")
 
     print("Finished Training - loss: {:.4f}".format(np.mean(train_loss)))
     print("start testing...", flush=True)
@@ -91,6 +96,9 @@ def main():
                 running_loss = 0.0
 
     print("Finished Testing - loss: {:.4f}".format(np.mean(test_loss)))
+
+    print("Saving modle....")
+    torch.save(net.state_dict(), SAVE + "_epoch_" + str(0+EPOCHS) + "_test" + str(round(np.mean(test_loss), 6)) + "_train" + str(round(np.mean(train_loss), 6)) + ".pth")
 
 if __name__ == "__main__":
     main()
