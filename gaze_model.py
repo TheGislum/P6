@@ -47,7 +47,7 @@ class annetV2(nn.Module):
         )
 
         # FCN og X,Y output layer
-        self.fcn_model = nn.Sequential(
+        self.full_model = nn.Sequential(
             conv_model,
             nn.Linear(512,512),
             nn.ReLU(inplace=True),
