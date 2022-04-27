@@ -3,8 +3,8 @@ import mouse
 import ctypes
 import keyboard
 import torch
-from face_tracking import FaceTracking
-from eye_isolation import EyeIsolation
+from face_tracking import FaceTracking, FastFaceTracking
+from eye_isolation import EyeIsolation, FastEyeIsolation
 
 class DataCollector:
     def __init__(self, calibration = None):
@@ -75,11 +75,11 @@ class DataCollector:
         if ret == True:
             if self.face.refresh(frame):
                 self.collected += 1
-                left_eye = EyeIsolation(frame, self.face.landmarks, 0, (50, 30)).colour_frame
-                right_eye = EyeIsolation(frame, self.face.landmarks, 1, (50, 30)).colour_frame
+                left_eye = FastEyeIsolation(frame, self.face.landmarks, 0, (60, 36)).colour_frame
+                right_eye = FastEyeIsolation(frame, self.face.landmarks, 1, (60, 36)).colour_frame
 
-                self.left_eye_list.append(torch.tensor(cv2.cvtColor(left_eye, cv2.COLOR_BGR2RGB)).permute(2,0,1))
-                self.right_eye_list.append(torch.tensor(cv2.cvtColor(right_eye, cv2.COLOR_BGR2RGB)).permute(2,0,1))
+                self.left_eye_list.append(torch.tensor(cv2.cvtColor(left_eye, cv2.COLOR_BGR2GRAY)).unsqueeze(0))
+                self.right_eye_list.append(torch.tensor(cv2.cvtColor(right_eye, cv2.COLOR_BGR2GRAY)).unsqueeze(0))
 
                 self.lable_list.append(position)
 

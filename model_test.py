@@ -8,6 +8,7 @@ from torchvision import transforms
 from face_tracking import FaceTracking, FastFaceTracking
 from eye_isolation import EyeIsolation, FastEyeIsolation
 from pose_estimation import PoseEstimation
+from calibration import Calibration
 
 webcam = cv2.VideoCapture(0)
 ret, img = webcam.read()
@@ -26,6 +27,9 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 net = annetV2(device=device, in_channels=2)
 net.load_state_dict(torch.load('./garage/both_synt_test_epoch_20_test0.000467_train0.002019.pth', map_location=device))
 net = net.eval()
+
+calibration = Calibration()
+offset_x, offset_y = calibration.Calibrate()
 
 while True:
     # We get a new frame from the webcam
@@ -49,7 +53,8 @@ while True:
             
             x = ((point[0].item() + 1) * (screenWidth/2))
             y = ((1 - point[1].item()) * (screenHeight/2))
-            mouse.move(x, y)
+
+            mouse.move(x + offset_x, y + offset_y)
         
 
     if keyboard.is_pressed('c') == True:
