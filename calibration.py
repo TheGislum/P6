@@ -5,6 +5,7 @@ import mouse
 import ctypes
 import keyboard
 import os
+import glob
 from gaze_model import annet
 from torchvision import transforms
 from face_tracking import FaceTracking
@@ -13,12 +14,16 @@ from pose_estimation import PoseEstimation
 from data_collector import DataCollector
 
 class Calibration:
-    def __init__(self):
+    def __init__(self, model = './garage/both_epoch_1000_0.009294.pth', channels = 6):
         self.datacollector = DataCollector("calibration")
+        self.model = model
+        self.channels = channels
 
     def Calibrate(self):
-        # self.Collect()
         dataset_dir = "./calibration_dataset/"
+        for file in glob.glob(dataset_dir):
+            os.remove(file)
+        self.Collect()
         file = "dataset_partx.pt"
         dataset = torch.load(os.path.join(dataset_dir, file))
         left_eye_images = dataset["left_eye"]
@@ -29,8 +34,8 @@ class Calibration:
         screenWidth, screenHeight = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)  # get monitor resolution
 
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        net = annet(device=device, in_channels=6)
-        net.load_state_dict(torch.load('./garage/both_epoch_1000_0.009294.pth', map_location=device))
+        net = annet(device=device, in_channels=self.channels)
+        net.load_state_dict(torch.load(self.model, map_location=device))
         net = net.eval()
 
         for i in range(len(left_eye_images)):
