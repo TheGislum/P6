@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 
 import torch
 from torch import nn
-from torch.optim import Adam
+from torch.optim import AdamW
 from torchvision import transforms
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
@@ -29,14 +29,17 @@ def get_data_loaders(train_batch_size, val_batch_size, data_split, dataset_dir):
     return train_loader, val_loader
 
 
-def run(train_batch_size, val_batch_size, data_split, dataset_dir, epochs, lr, weight_decay, log_interval, save_dir):
+def run(train_batch_size, val_batch_size, data_split, dataset_dir, epochs, lr, weight_decay, log_interval, save_dir, use_last_checkpoint):
     train_loader, val_loader = get_data_loaders(train_batch_size, val_batch_size, data_split, dataset_dir)
     
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = annetV2(device=device, in_channels=2)
+    
+    if use_last_checkpoint == True:
+        model.load_state_dict(torch.load('./checkpoints/checkpoint.pth', map_location=device))
 
     model.to(device)  # Move model before creating optimizer
-    optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay, amsgrad=False)
+    optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     criterion = nn.MSELoss()
     trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
 
@@ -64,6 +67,13 @@ def run(train_batch_size, val_batch_size, data_split, dataset_dir, epochs, lr, w
         tqdm.write(f"Training Results - Epoch: {engine.state.epoch} Avg loss: {avg_MSE:.6f}")
 
     @trainer.on(Events.EPOCH_COMPLETED)
+    def save_model(engine):
+        avg_MSE = evaluator.state.metrics["MSE"]
+        model_name = "checkpoint.pth"
+        tqdm.write(f"{trainer.last_event_name.name}: saving model as: {model_name}")
+        torch.save(model.state_dict(), './checkpoints/' + model_name)
+
+    @trainer.on(Events.EPOCH_COMPLETED)
     def log_time(engine):
         tqdm.write(f"{trainer.last_event_name.name} took { trainer.state.times[trainer.last_event_name.name]} seconds")
 
@@ -86,7 +96,7 @@ def run(train_batch_size, val_batch_size, data_split, dataset_dir, epochs, lr, w
         avg_MSE = evaluator.state.metrics["MSE"]
         model_name = f"gazeModel_epoch_{engine.state.epoch}_loss_{avg_MSE:.6f}.pth"
         tqdm.write(f"{trainer.last_event_name.name}: saving model as: {model_name}")
-        torch.save(model, save_dir + model_name)
+        torch.save(model.state_dict(), save_dir + model_name)
 
     trainer.run(train_loader, max_epochs=epochs)
     pbar.close()
@@ -98,12 +108,14 @@ if __name__ == "__main__":
     parser.add_argument("--val_batch_size", type=int, default=128, help="input batch size for validation (default: 128)")
     parser.add_argument("--data_split", type=float, default=0.9, help="training/validation dataset split (default: 0.9)")
     parser.add_argument("--dataset_dir", type=str, default='./eye_dataset/', help="dataset directory")
-    parser.add_argument("--epochs", type=int, default=2, help="number of epochs to train (default: 10)")
+    parser.add_argument("--epochs", type=int, default=10, help="number of epochs to train (default: 10)")
     parser.add_argument("--lr", type=float, default=0.0001, help="learning rate (default: 0.0001)")
-    parser.add_argument("--weight_decay", type=float, default=0.0, help="Adam weight_decay (default: 0.0)")
+    parser.add_argument("--weight_decay", type=float, default=0.3, help="Adam weight_decay (default: 0.3)")
     parser.add_argument("--log_interval", type=int, default=10, help="how many batches to wait before logging training status")
     parser.add_argument("--save_dir", type=str, default='./garage/', help="directory to save the model in (default: ./garage/)")
+    parser.add_argument("--use_last_checkpoint", type=bool, default=False, help="wether to use last checkpoint (default: False)")
 
     args = parser.parse_args()
 
-    run(args.batch_size, args.val_batch_size, args.data_split, args.dataset_dir, args.epochs, args.lr, args.weight_decay, args.log_interval, args.save_dir)
+    run(args.batch_size, args.val_batch_size, args.data_split, args.dataset_dir, args.epochs, args.lr,
+    args.weight_decay, args.log_interval, args.save_dir, args.use_last_checkpoint)
