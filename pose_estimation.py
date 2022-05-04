@@ -1,18 +1,20 @@
 import cv2
 import math
 import numpy as np
-
+from mpmath import cot
+import torch
 class PoseEstimation:
 
     MODEL_POINTS = np.array([
-                            (0.0, 0.0, 0.0),             # Nose tip
-                            (0.0, -330.0, -65.0),        # Chin
-                            (-225.0, 170.0, -135.0),     # Left eye left corner
-                            (225.0, 170.0, -135.0),      # Right eye right corne
-                            (-150.0, -150.0, -125.0),    # Left Mouth corner
-                            (150.0, -150.0, -125.0)      # Right mouth corner
-                        ])
-    FACE_POINTS = [30, 8, 36, 45, 48, 54]
+                            (0.0, 0.0, 0.0),             # Between the eyes
+                            (0.0, -170.0, 135.0),        # Nose tip
+                            (0.0, -500.0, -70.0),        # Chin
+                            (-225.0, 0.0, 0.0),          # Left eye left corner
+                            (225.0, 0.0, 0.0),           # Right eye right corner
+                            (-150.0, -320.0, 10.0),      # Left Mouth corner
+                            (150.0, -320.0, 10.0)        # Right mouth corner
+                            ])
+    FACE_POINTS = [27, 30, 8, 36, 45, 48, 54] # Facial landmark values for abovementioned points, as denoted by dlib
 
     def __init__(self, frame):
         self.x = None
@@ -25,17 +27,15 @@ class PoseEstimation:
         self._image_points = None
         self.lines = None
         self.frame = frame
-        self.tpitch = None
-        self.tyaw = None
         self.updatelimit = 5
         self.currentupdate = 5
+        self.pose = None
 
-        size = frame.shape
-        focal_length = size[1]
-        center = (size[1]/2, size[0]/2)
+        self.height, self.width, channels = frame.shape
+        center = (self.width / 2, self.height / 2)
         self.camera_matrix = np.array(
-                                [[focal_length, 0, center[0]],
-                                [0, focal_length, center[1]],
+                                [[self.width, 0, center[0]],
+                                [0, self.height, center[1]],
                                 [0, 0, 1]], dtype = "double"
                                 )
 
@@ -161,76 +161,87 @@ class PoseEstimation:
         dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
         (success, rotation_vector, translation_vector) = cv2.solvePnP(self.MODEL_POINTS, self._image_points, self.camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_UPNP)
 
-        # Project a 3D point (0, 0, 1000.0) onto the image plane.
-        # We use this to draw a line sticking out of the nose
-
-        #(nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 1000.0)]), rotation_vector, translation_vector, self.camera_matrix, dist_coeffs)
-
+        # Project 3 3D point onto the image plane.
+        # We use this to draw 3 lines sticking out of the point between the eyes
         axis = np.float32([[500, 0, 0],
                            [0, 500, 0],
                            [0, 0, 500]])
-        (nose_end_point2D, jacobian) = cv2.projectPoints(axis, rotation_vector,
+        (between_eyes_point_2D, jacobian) = cv2.projectPoints(axis, rotation_vector,
                                                          translation_vector, self.camera_matrix, dist_coeffs)
 
-        rvec_matrix = cv2.Rodrigues(rotation_vector)[0]
-        proj_matrix = np.hstack((rvec_matrix, translation_vector))
-        decomp_proj_matrix  = cv2.decomposeProjectionMatrix(proj_matrix)
-        cam_intrinsic_matrix = np.array(decomp_proj_matrix[0])
-        transformation_matrix = np.vstack([proj_matrix, [0, 0, 0, 1]])
+        # Define the lines to be drawn
+        between_eyes = ( int(self._image_points[0][0]), int(self._image_points[0][1]))
+        l1 = (int(between_eyes_point_2D[0][0][0]), int(between_eyes_point_2D[0][0][1]))
+        l2 = (int(between_eyes_point_2D[1][0][0]), int(between_eyes_point_2D[1][0][1]))
+        l3 = (int(between_eyes_point_2D[2][0][0]), int(between_eyes_point_2D[2][0][1]))
+        self.lines = between_eyes, l1, l2, l3
+
+        # Get the projection matrix and use it to get XYZ and pitch, yaw and roll
+        rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
+        proj_matrix = np.hstack((rotation_matrix, translation_vector))
+        x, y, z = self._getXYZ(proj_matrix)
+        self.x = x / self.width    #Scale down to be between 0 and 1
+        self.y = y / self.height   #Scale down to be between 0 and 1
+        self.z = z / 10000         #Scale down to be between 0 and 1
+
+        pitch, yaw, roll = self._rotationMatrixToEulerAngles(rotation_matrix)
+
+        # Only update the numbers once in a while to be able to better read them
+        if self.currentupdate >= self.updatelimit:
+            self.pitch = pitch
+            self.yaw = yaw
+            self.roll = roll
+            self.currentupdate = 0
+
+        # Translate pose into a torch tensor
+        self.pose = torch.tensor(np.hstack(([self.x, self.y, self.z], [self.pitch, self.yaw, self.roll])))
+        self.currentupdate = self.currentupdate + 1
+
+    def _rotationMatrixToEulerAngles(self, R):
+        # Calculation details at https://learnopencv.com/rotation-matrix-to-euler-angles/
+        sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
+
+        singular = sy < 1e-6
+
+        if not singular:
+            x = math.atan2(R[2, 1], R[2, 2])
+            y = math.atan2(-R[2, 0], sy)
+            z = math.atan2(R[1, 0], R[0, 0])
+        else:
+            x = math.atan2(-R[1, 2], R[1, 1])
+            y = math.atan2(-R[2, 0], sy)
+            z = 0
+
+        return np.array([x, y, z])
+
+    def _getXYZ(self, proj_matrix):
+        # Calculation details at http://faculty.salina.k-state.edu/tim/mVision/ImageFormation/projection.html
+        cam_extrinsic_matrix = np.vstack([proj_matrix, [0, 0, 0, 1]])
         perspective_projection_model = np.array([[1, 0, 0, 0],
                                                  [0, 1, 0, 0],
                                                  [0, 0, 1, 0]])
-        nose = ( int(self._image_points[0][0]), int(self._image_points[0][1]))
-        point_vector = np.array([[nose[0]],
-                                 [nose[1]],
-                                 [1],
-                                 [1]])
-        dotted_matrix = np.linalg.multi_dot([cam_intrinsic_matrix, perspective_projection_model, transformation_matrix])
-        inverted_dotted_matrix = np.linalg.inv(np.vstack([dotted_matrix, [1, 1, 1, 1]]))
-        #inverted_dotted_matrix = np.linalg.multi_dot([np.linalg.inv(transformation_matrix), np.linalg.inv(np.vstack([proj_matrix, [1, 1, 1, 1]])), np.linalg.inv(cam_intrinsic_matrix)])
-        world_point_vector = np.dot(inverted_dotted_matrix, point_vector)
-        self.x = world_point_vector[0]
-        self.y = world_point_vector[1]
-        self.z = world_point_vector[2]
+        cam_intrinsic_matrix = np.dot(self.camera_matrix, perspective_projection_model)
+        camera_matrix = np.dot(cam_intrinsic_matrix, cam_extrinsic_matrix)
+        point_vector = np.array([0, 0, 0, 1]) # Calculate from the point between the eyes (0,0,0 in head coordinates)
+        camera_point_vector = np.dot(camera_matrix, point_vector)
 
-        eulerAngles = decomp_proj_matrix[6]
-        pitch, yaw, roll = [math.radians(_) for _ in eulerAngles]
+        #Divide by the depth, to get the x,y coordinates without relation to depth
+        depth = camera_point_vector[2]
+        camera_point_vector = camera_point_vector / depth
+        camera_point_vector[2] = depth
 
-        l1 = (int(nose_end_point2D[0][0][0]), int(nose_end_point2D[0][0][1]))
-        l2 = (int(nose_end_point2D[1][0][0]), int(nose_end_point2D[1][0][1]))
-        l3 = (int(nose_end_point2D[2][0][0]), int(nose_end_point2D[2][0][1]))
-
-        self.lines = nose, l1, l2, l3
-
-        if self.currentupdate >= self.updatelimit:
-            try:
-                self.pitch = math.degrees(math.asin(math.sin(pitch)))
-            except:
-                self.pitch = 90
-
-            try:
-                self.yaw = math.degrees(math.asin(math.sin(yaw)))
-            except:
-                self.yaw = 90
-
-            try:
-                self.roll = math.degrees(math.asin(math.sin(roll)))
-            except:
-                self.roll = 0
-
-            self.currentupdate = 0
-        self.currentupdate = self.currentupdate + 1
+        return camera_point_vector
 
     def draw_facing(self, frame):
         if self.face_landmarks != None:
-            nose, l1, l2, l3 = self.lines
+            between_eyes, l1, l2, l3 = self.lines
 
             for p in self._image_points:
                 cv2.circle(frame, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
             
-            cv2.line(frame, nose, l1, (0, 255, 0), 3)  # GREEN
-            cv2.line(frame, nose, l2, (255, 0,), 3)  # BLUE
-            cv2.line(frame, nose, l3, (0, 0, 255), 3)  # RED
+            cv2.line(frame, between_eyes, l1, (0, 255, 0), 3)  # GREEN
+            cv2.line(frame, between_eyes, l2, (255, 0,), 3)  # BLUE
+            cv2.line(frame, between_eyes, l3, (0, 0, 255), 3)  # RED
 
     def write_position_on_frame(self, frame):
         cv2.putText(frame, "Pitch:  " + str(self.pitch), (45, 30), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)
@@ -238,4 +249,4 @@ class PoseEstimation:
         cv2.putText(frame, "Roll: " + str(self.roll), (45, 100), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)
         cv2.putText(frame, "X: " + str(self.x), (45, 135), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)
         cv2.putText(frame, "Y: " + str(self.y), (45, 170), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)
-        cv2.putText(frame, "Z: " + str(self.roll), (45, 205), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)
+        cv2.putText(frame, "Z: " + str(self.z), (45, 205), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)

@@ -11,6 +11,8 @@ from pose_estimation import PoseEstimation
 from calibration import Calibration
 
 webcam = cv2.VideoCapture(0)
+webcam.set(cv2.CAP_PROP_FRAME_WIDTH, 10000)     #Set resolution to impossibly high, to get max resolution of device
+webcam.set(cv2.CAP_PROP_FRAME_HEIGHT, 10000)
 ret, img = webcam.read()
 
 # face = FaceTracking()
