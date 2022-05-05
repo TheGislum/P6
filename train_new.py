@@ -7,7 +7,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
-from gaze_model import annetV2
+from gaze_model import annetV3
 from eye_dataset import eyeDataset
 
 from ignite.engine import create_supervised_evaluator, create_supervised_trainer, Events
@@ -33,7 +33,7 @@ def run(train_batch_size, val_batch_size, data_split, dataset_dir, epochs, lr, w
     train_loader, val_loader = get_data_loaders(train_batch_size, val_batch_size, data_split, dataset_dir)
     
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = annetV2(device=device, in_channels=2)
+    model = annetV3(device=device, in_channels=2)
     
     if use_last_checkpoint == True:
         model.load_state_dict(torch.load('./checkpoints/checkpoint.pth', map_location=device))
@@ -108,8 +108,8 @@ if __name__ == "__main__":
     parser.add_argument("--val_batch_size", type=int, default=128, help="input batch size for validation (default: 128)")
     parser.add_argument("--data_split", type=float, default=0.9, help="training/validation dataset split (default: 0.9)")
     parser.add_argument("--dataset_dir", type=str, default='./eye_dataset/', help="dataset directory")
-    parser.add_argument("--epochs", type=int, default=10, help="number of epochs to train (default: 10)")
-    parser.add_argument("--lr", type=float, default=0.0001, help="learning rate (default: 0.0001)")
+    parser.add_argument("--epochs", type=int, default=100, help="number of epochs to train (default: 10)")
+    parser.add_argument("--lr", type=float, default=1.407292394580727e-07, help="learning rate (default: 0.0001)")
     parser.add_argument("--weight_decay", type=float, default=0.3, help="Adam weight_decay (default: 0.3)")
     parser.add_argument("--log_interval", type=int, default=10, help="how many batches to wait before logging training status")
     parser.add_argument("--save_dir", type=str, default='./garage/', help="directory to save the model in (default: ./garage/)")

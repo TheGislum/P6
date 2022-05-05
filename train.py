@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from torch import nn, optim
-from gaze_model import annetV2
+from gaze_model import annetV3
 from eye_dataset import eyeDataset
 from torchvision import transforms
 from torch.utils.data import DataLoader
@@ -13,11 +13,11 @@ def main():
     WEIGHT_DECAY = 0.00
     LEARNING_RATE = 0.0001
     PRINT_EVERY = 1024
-    SAVE = './garage/both_synt_test'
+    SAVE = './garage/test'
     dataset_dir = './eye_dataset/'
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    net = annetV2(device=device, in_channels=2)
+    net = annetV3(device=device, in_channels=2)
     #net.load_state_dict(torch.load('./garage/metr_epoch_1000_0.005517.pth', map_location=device))
 
     img_transform = transforms.Compose([ # bw transform
@@ -49,7 +49,6 @@ def main():
         for i, data in enumerate(train_loader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
-            inputs = inputs.to(device)
             labels = labels.to(device)
 
             # zero the parameter gradients

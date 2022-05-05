@@ -11,7 +11,7 @@ from ray.tune.schedulers import ASHAScheduler
 from ray.tune.schedulers.hb_bohb import HyperBandForBOHB
 from ray.tune.suggest.bohb import TuneBOHB
 from ray.tune.suggest import ConcurrencyLimiter
-from gaze_model import annetV2
+from gaze_model import annetV3
 from eye_dataset import eyeDataset
 
 
@@ -32,7 +32,7 @@ def train_cifar(config, checkpoint_dir='./checkpoints', data_dir=None):
         device = "cuda:0"
         if torch.cuda.device_count() > 1:
             net = nn.DataParallel(net)
-    net = annetV2(device, in_channels=2)
+    net = annetV3(device, in_channels=2)
 
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(net.parameters(), lr=config["lr"], weight_decay=config["weight_decay"])
@@ -66,7 +66,7 @@ def train_cifar(config, checkpoint_dir='./checkpoints', data_dir=None):
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
-            inputs, labels = inputs.to(device), labels.to(device)
+            labels = labels.to(device)
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -92,7 +92,7 @@ def train_cifar(config, checkpoint_dir='./checkpoints', data_dir=None):
         for i, data in enumerate(valloader, 0):
             with torch.no_grad():
                 inputs, labels = data
-                inputs, labels = inputs.to(device), labels.to(device)
+                labels = labels.to(device)
 
                 outputs = net(inputs)
 
@@ -112,9 +112,9 @@ def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0):
     data_dir = os.path.abspath("./eye_dataset/")
     load_data(data_dir)
     config = {
-        "lr": 7e-5, #tune.loguniform(1e-6, 1.5e-4),
-        "weight_decay": tune.loguniform(1e-4, 5e-1),
-        "batch_size": 128 #tune.choice([16, 32, 64, 128])
+        "lr": tune.loguniform(1e-8, 1.5e-6),
+        "weight_decay": 0.0, #tune.loguniform(1e-4, 5e-1),
+        "batch_size": 64 #tune.choice([16, 32, 64, 128])
     }
     # scheduler = ASHAScheduler(
     #     metric="loss",
@@ -133,7 +133,7 @@ def main(num_samples=10, max_num_epochs=10, gpus_per_trial=0):
         )
     result = tune.run(
         partial(train_cifar, data_dir=data_dir),
-        name="gaze_model_BOHB_better_wd",
+        name="gaze_model_V3_BOHB_lr_wd0",
         resources_per_trial={"cpu": 4, "gpu": gpus_per_trial},
         config=config,
         num_samples=num_samples,
