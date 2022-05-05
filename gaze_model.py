@@ -4,6 +4,7 @@ class annetV3(nn.Module):
 
     def __init__(self, device, in_channels=2):
         super(annetV3, self).__init__()
+        self.device = device
 
         self.conv_model = nn.Sequential(
             #64 -> 32 BLOCK
@@ -60,15 +61,20 @@ class annetV3(nn.Module):
         
         self.headpose_layer = nn.Linear(6,512).to(device)
 
-    def forward(self, image, headpose):
+    def forward(self, input):
+        image, headpose = input
+        image = image.to(self.device)
+        headpose = headpose.to(self.device)
+
         output = self.conv_model(image) + self.headpose_layer(headpose)
-        output = self.fcn(output)
+        output = self.FCN_model(output)
         return output
 
 class annetV2(nn.Module):
 
     def __init__(self, device, in_channels=3):
         super(annetV2, self).__init__()
+        self.device = device
 
         conv_model = nn.Sequential(
             #64 -> 32 BLOCK
@@ -125,6 +131,7 @@ class annetV2(nn.Module):
         ).to(device)
 
     def forward(self, input):
+        input = input.to(self.device)
         output = self.full_model(input)
         return output
 

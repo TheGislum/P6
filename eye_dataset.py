@@ -100,6 +100,8 @@ class eyeDataset(Dataset):
 
             euler = self._rotationMatrixToEulerAngles(head_rotation @ cv2.decomposeProjectionMatrix(projMatrix)[1])
 
-            pose = torch.tensor(np.hstack((xyz, euler)))
+            pose = torch.tensor(np.hstack((xyz, euler)), dtype=torch.float32)
 
-            return (img, lable, pose)
+            input = (img, pose)
+
+            return input, lable
