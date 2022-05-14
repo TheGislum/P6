@@ -1,22 +1,31 @@
 import cv2
 import math
 import numpy as np
-from mpmath import cot
 import torch
+from mpmath import cot
+
 class PoseEstimation:
+    MODEL_POINTS_SLOW = np.array([
+                                (0.0, -170.0, 135.0),    # Nose tip
+                                (0.0, 0.0, 0.0),         # Between the eyes
+                                (0.0, -500.0, -70.0),    # Chin
+                                (-225.0, 0.0, 0.0),      # Left eye left corner
+                                (225.0, 0.0, 0.0),       # Right eye right corner
+                                (-150.0, -320.0, 10.0),  # Left Mouth corner
+                                (150.0, -320.0, 10.0)    # Right mouth corner
+                                ])
+    FACE_POINTS_SLOW = [30, 27, 8, 36, 45, 48, 54] # Facial landmark values for abovementioned points, as denoted by dlib
 
-    MODEL_POINTS = np.array([
-                            (0.0, 0.0, 0.0),             # Between the eyes
-                            (0.0, -170.0, 135.0),        # Nose tip
-                            (0.0, -500.0, -70.0),        # Chin
-                            (-225.0, 0.0, 0.0),          # Left eye left corner
-                            (225.0, 0.0, 0.0),           # Right eye right corner
-                            (-150.0, -320.0, 10.0),      # Left Mouth corner
-                            (150.0, -320.0, 10.0)        # Right mouth corner
+    MODEL_POINTS_FAST = np.array([
+                            (0.0, -340.0, 393.0),        # Nose tip
+                            (-460.0, -20.0, -26.0),      # Left eye left corner
+                            (460.0, -20.0, -26.0),       # Right eye right corner
+                            (-177.0, 0.0, 0.0),          # Left eye right corner
+                            (177.0, 0.0, 0.0),           # Right eye left corner
                             ])
-    FACE_POINTS = [27, 30, 8, 36, 45, 48, 54] # Facial landmark values for abovementioned points, as denoted by dlib
+    FACE_POINTS_FAST = [30, 36, 45, 39, 42] # Facial landmark values for abovementioned points, as denoted by dlib
 
-    def __init__(self, frame):
+    def __init__(self, frame, fast = False):
         self.x = None
         self.y = None
         self.z = None
@@ -27,15 +36,19 @@ class PoseEstimation:
         self._image_points = None
         self.lines = None
         self.frame = frame
-        self.updatelimit = 5
-        self.currentupdate = 5
         self.pose = None
+        if fast:
+            self.model_points = self.MODEL_POINTS_FAST
+            self.face_points = self.FACE_POINTS_FAST
+        else:
+            self.model_points = self.MODEL_POINTS_SLOW
+            self.face_points = self.FACE_POINTS_SLOW
 
         self.height, self.width, channels = frame.shape
         center = (self.width / 2, self.height / 2)
         self.camera_matrix = np.array(
                                 [[self.width, 0, center[0]],
-                                [0, self.height, center[1]],
+                                [0, self.width, center[1]],
                                 [0, 0, 1]], dtype = "double"
                                 )
 
@@ -157,24 +170,27 @@ class PoseEstimation:
         self._analyze()
 
     def _analyze(self):
-        self._image_points = np.array([(self.face_landmarks.part(i).x, self.face_landmarks.part(i).y) for i in self.FACE_POINTS ], dtype="double")
+        self._image_points = np.array([(self.face_landmarks.part(i).x, self.face_landmarks.part(i).y) for i in self.face_points ], dtype="float32")
         dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
-        (success, rotation_vector, translation_vector) = cv2.solvePnP(self.MODEL_POINTS, self._image_points, self.camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_UPNP)
+        #(success, rotation_vector, translation_vector) = cv2.solvePnP(self.model_points, self._image_points, self.camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_UPNP)
+        (success, rotation_vector, translation_vector, inliers) = cv2.solvePnPRansac(self.model_points, self._image_points, self.camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_UPNP)
 
         # Project 3 3D point onto the image plane.
-        # We use this to draw 3 lines sticking out of the point between the eyes
-        axis = np.float32([[500, 0, 0],
-                           [0, 500, 0],
-                           [0, 0, 500]])
-        (between_eyes_point_2D, jacobian) = cv2.projectPoints(axis, rotation_vector,
+        # We use this to draw 3 lines sticking out of the nose tip
+        axis = np.float32([[500, -170, 135],
+                           [0, 330, 135],
+                           [0, -170, 635]])
+        #axis = np.float32([[0, 0, 1000]])
+        (nose_point_2D, jacobian) = cv2.projectPoints(axis, rotation_vector,
                                                          translation_vector, self.camera_matrix, dist_coeffs)
 
         # Define the lines to be drawn
-        between_eyes = ( int(self._image_points[0][0]), int(self._image_points[0][1]))
-        l1 = (int(between_eyes_point_2D[0][0][0]), int(between_eyes_point_2D[0][0][1]))
-        l2 = (int(between_eyes_point_2D[1][0][0]), int(between_eyes_point_2D[1][0][1]))
-        l3 = (int(between_eyes_point_2D[2][0][0]), int(between_eyes_point_2D[2][0][1]))
-        self.lines = between_eyes, l1, l2, l3
+        nose = ( int(self._image_points[0][0]), int(self._image_points[0][1]))
+        l1 = (int(nose_point_2D[0][0][0]), int(nose_point_2D[0][0][1]))
+        l2 = (int(nose_point_2D[1][0][0]), int(nose_point_2D[1][0][1]))
+        l3 = (int(nose_point_2D[2][0][0]), int(nose_point_2D[2][0][1]))
+        self.lines = nose, l1, l2, l3
+        #self.lines = nose, l1
 
         # Get the projection matrix and use it to get XYZ and pitch, yaw and roll
         rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
@@ -184,18 +200,10 @@ class PoseEstimation:
         self.y = y / self.height   #Scale down to be between 0 and 1
         self.z = z / 10000         #Scale down to be between 0 and 1
 
-        pitch, yaw, roll = self._rotationMatrixToEulerAngles(rotation_matrix)
-
-        # Only update the numbers once in a while to be able to better read them
-        if self.currentupdate >= self.updatelimit:
-            self.pitch = pitch
-            self.yaw = yaw
-            self.roll = roll
-            self.currentupdate = 0
+        self.pitch, self.yaw, self.roll = self._rotationMatrixToEulerAngles(rotation_matrix)
 
         # Translate pose into a torch tensor
         self.pose = torch.tensor(np.hstack(([self.x, self.y, self.z], [self.pitch, self.yaw, self.roll])))
-        self.currentupdate = self.currentupdate + 1
 
     def _rotationMatrixToEulerAngles(self, R):
         # Calculation details at https://learnopencv.com/rotation-matrix-to-euler-angles/
@@ -234,14 +242,15 @@ class PoseEstimation:
 
     def draw_facing(self, frame):
         if self.face_landmarks != None:
-            between_eyes, l1, l2, l3 = self.lines
+            nose, l1, l2, l3 = self.lines
+            #nose, l1 = self.lines
 
             for p in self._image_points:
                 cv2.circle(frame, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
             
-            cv2.line(frame, between_eyes, l1, (0, 255, 0), 3)  # GREEN
-            cv2.line(frame, between_eyes, l2, (255, 0,), 3)  # BLUE
-            cv2.line(frame, between_eyes, l3, (0, 0, 255), 3)  # RED
+            cv2.line(frame, nose, l1, (0, 255, 0), 3)  # GREEN
+            cv2.line(frame, nose, l2, (255, 0,), 3)  # BLUE
+            cv2.line(frame, nose, l3, (0, 0, 255), 3)  # RED
 
     def write_position_on_frame(self, frame):
         cv2.putText(frame, "Pitch:  " + str(self.pitch), (45, 30), cv2.FONT_HERSHEY_DUPLEX, 0.9, (147, 58, 31), 1)

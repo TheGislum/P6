@@ -9,7 +9,7 @@ webcam.set(cv2.CAP_PROP_FRAME_HEIGHT, 10000)
 ret, img = webcam.read()
 
 face = FaceTracking()
-pose = PoseEstimation(img)
+pose = PoseEstimation(img, True)
 
 while True:
     # We get a new frame from the webcam
