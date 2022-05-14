@@ -1,13 +1,14 @@
 import cv2
+import torch
 import mouse
 import ctypes
 import keyboard
-import torch
+from pose_estimation import PoseEstimation
 from face_tracking import FaceTracking, FastFaceTracking
 from eye_isolation import EyeIsolation, FastEyeIsolation
 
 class DataCollector:
-    def __init__(self, calibration = None):
+    def __init__(self, calibration = None, fast=False, model_colour = False, version = 2):
         if calibration is None:
             self.dataset_dir = "./eye_dataset/"
             self.stepX = 80
@@ -22,9 +23,18 @@ class DataCollector:
         self.left_eye_list = []
         self.right_eye_list = []
         self.lable_list = []
+        self.pose_list = []
         self.startX = 40
         self.startY = 20
-        self.face = FaceTracking()
+        self.fast = fast
+        self.model_colour = model_colour
+        self.version = version
+        if fast:
+            self.face = FastFaceTracking()
+            self.pose = PoseEstimation() #TODO update to fast and iniitiate with frame
+        else:
+            self.face = FaceTracking()
+            self.pose = PoseEstimation()
         self.webcam = cv2.VideoCapture(0)
 
     def RunCollection(self):
@@ -75,18 +85,32 @@ class DataCollector:
         if ret == True:
             if self.face.refresh(frame):
                 self.collected += 1
-                left_eye = FastEyeIsolation(frame, self.face.landmarks, 0, (60, 36)).colour_frame
-                right_eye = FastEyeIsolation(frame, self.face.landmarks, 1, (60, 36)).colour_frame
+                if self.fast:
+                    left_eye = FastEyeIsolation(frame, self.face.landmarks, 0, (60, 36)).colour_frame
+                    right_eye = FastEyeIsolation(frame, self.face.landmarks, 1, (60, 36)).colour_frame
+                else:
+                    left_eye = EyeIsolation(frame, self.face.landmarks, 0, (60, 36)).colour_frame
+                    right_eye = EyeIsolation(frame, self.face.landmarks, 1, (60, 36)).colour_frame
 
-                self.left_eye_list.append(torch.tensor(cv2.cvtColor(left_eye, cv2.COLOR_BGR2GRAY)).unsqueeze(0))
-                self.right_eye_list.append(torch.tensor(cv2.cvtColor(right_eye, cv2.COLOR_BGR2GRAY)).unsqueeze(0))
+                if self.version == 3:
+                    self.pose.refresh(frame, self.face.landmarks)
+                    self.pose_list.append(self.pose.pose)
+
+                if self.model_colour:
+                    self.left_eye_list.append(torch.tensor(cv2.cvtColor(left_eye, cv2.COLOR_BGR2RGB)).unsqueeze(0))
+                    self.right_eye_list.append(torch.tensor(cv2.cvtColor(right_eye, cv2.COLOR_BGR2RGB)).unsqueeze(0))
+                else:
+                    self.left_eye_list.append(torch.tensor(cv2.cvtColor(left_eye, cv2.COLOR_BGR2GRAY)).unsqueeze(0))
+                    self.right_eye_list.append(torch.tensor(cv2.cvtColor(right_eye, cv2.COLOR_BGR2GRAY)).unsqueeze(0))
+
 
                 self.lable_list.append(position)
 
     def SaveData(self):
         self.left_eye_list = torch.stack(self.left_eye_list, 0)
         self.right_eye_list = torch.stack(self.right_eye_list, 0)
+        self.pose_list = torch.stack(self.pose_list, 0) #NOTE maby None handeling?
         self.lable_list = torch.stack(self.lable_list, 0)
-        torch.save({"left_eye":self.left_eye_list, "right_eye":self.right_eye_list, "lables":self.lable_list}, self.dataset_dir + "dataset_partx.pt")
+        torch.save({"left_eye":self.left_eye_list, "right_eye":self.right_eye_list, "lables":self.lable_list, "pose": self.pose_list}, self.dataset_dir + "dataset_partx.pt")
 
         self.webcam.release()
