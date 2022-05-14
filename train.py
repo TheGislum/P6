@@ -65,7 +65,7 @@ def main():
             # print statistics
             running_loss += loss.item()
             if i % PRINT_EVERY == 0:    # print every PRINT_EVERY mini-batches
-                print(f'[{epoch + 1}, {i + 1:3d}] loss: {np.mean(train_loss[-PRINT_EVERY:]):.6f}')
+                print(f'[{epoch + 1}] loss: {np.mean(train_loss[-PRINT_EVERY:]):.6f}')
                 running_loss = 0.0
 
     #torch.save(net.state_dict(), SAVE + "_epoch_" + str(0+EPOCHS) + "_" + str(round(np.mean(train_loss), 6)) + ".pth")
@@ -79,7 +79,6 @@ def main():
         for i, data in enumerate(test_loader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
-            inputs = inputs.to(device)
             labels = labels.to(device)
 
             # forward + backward + optimize
@@ -91,7 +90,7 @@ def main():
             # print statistics
             running_loss += loss.item()
             if i % PRINT_EVERY == 0:    # print every PRINT_EVERY mini-batches
-                print(f'[{epoch + 1}, {i + 1:3d}] loss: {np.mean(train_loss[-PRINT_EVERY:]):.6f}')
+                print(f'[{epoch + 1}] loss: {np.mean(train_loss[-PRINT_EVERY:]):.6f}')
                 running_loss = 0.0
 
     print("Finished Testing - loss: {:.4f}".format(np.mean(test_loss)))
