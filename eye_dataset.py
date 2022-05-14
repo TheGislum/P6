@@ -94,8 +94,8 @@ class eyeDataset(Dataset):
             xyz = projMatrix @ origin
             z = xyz[2]
             xyz /= z
-            xyz[0] = camres[0]
-            xyz[1] = camres[1]
+            xyz[0] /= camres[0]
+            xyz[1] /= camres[1]
             xyz[2] = z / 10000
 
             euler = self._rotationMatrixToEulerAngles(head_rotation @ cv2.decomposeProjectionMatrix(projMatrix)[1])
