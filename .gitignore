@@ -6,6 +6,7 @@ trained_models/mmod_human_face_detector.dat
 zlib
 test.py
 checkpoints
+UT Multi-view Gaze Dataset
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
