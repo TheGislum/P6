@@ -128,8 +128,8 @@ class FastEyeIsolation(object):
     initiates the gaze detection.
     """
 
-    LEFT_EYE_POINTS = [0, 1]
-    RIGHT_EYE_POINTS = [2, 3]
+    LEFT_EYE_POINTS = [2, 3]
+    RIGHT_EYE_POINTS = [0, 1]
 
     def __init__(self, original_frame, landmarks, side, resolution=None):
         self.frame = None
