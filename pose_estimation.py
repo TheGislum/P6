@@ -172,7 +172,6 @@ class PoseEstimation:
     def _analyze(self):
         self._image_points = np.array([(self.face_landmarks.part(i).x, self.face_landmarks.part(i).y) for i in self.face_points ], dtype="float32")
         dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
-        #(success, rotation_vector, translation_vector) = cv2.solvePnP(self.model_points, self._image_points, self.camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_UPNP)
         (success, rotation_vector, translation_vector, inliers) = cv2.solvePnPRansac(self.model_points, self._image_points, self.camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_UPNP)
 
         # Project 3 3D point onto the image plane.
@@ -180,7 +179,6 @@ class PoseEstimation:
         axis = np.float32([[500, -170, 135],
                            [0, 330, 135],
                            [0, -170, 635]])
-        #axis = np.float32([[0, 0, 1000]])
         (nose_point_2D, jacobian) = cv2.projectPoints(axis, rotation_vector,
                                                          translation_vector, self.camera_matrix, dist_coeffs)
 
@@ -190,7 +188,6 @@ class PoseEstimation:
         l2 = (int(nose_point_2D[1][0][0]), int(nose_point_2D[1][0][1]))
         l3 = (int(nose_point_2D[2][0][0]), int(nose_point_2D[2][0][1]))
         self.lines = nose, l1, l2, l3
-        #self.lines = nose, l1
 
         # Get the projection matrix and use it to get XYZ and pitch, yaw and roll
         rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
@@ -243,7 +240,6 @@ class PoseEstimation:
     def draw_facing(self, frame):
         if self.face_landmarks != None:
             nose, l1, l2, l3 = self.lines
-            #nose, l1 = self.lines
 
             for p in self._image_points:
                 cv2.circle(frame, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
