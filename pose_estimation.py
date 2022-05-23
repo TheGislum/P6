@@ -2,7 +2,6 @@ import cv2
 import math
 import numpy as np
 import torch
-from mpmath import cot
 
 class PoseEstimation:
     MODEL_POINTS_SLOW = np.array([
@@ -23,7 +22,7 @@ class PoseEstimation:
                             (-177.0, 0.0, 0.0),          # Left eye right corner
                             (177.0, 0.0, 0.0),           # Right eye left corner
                             ])
-    FACE_POINTS_FAST = [30, 36, 45, 39, 42] # Facial landmark values for abovementioned points, as denoted by dlib
+    FACE_POINTS_FAST = [4, 2, 0, 3, 1] # Facial landmark values for abovementioned points, as denoted by dlib
 
     def __init__(self, frame, fast = False):
         self.x = None
@@ -195,15 +194,12 @@ class PoseEstimation:
         # Get the projection matrix and use it to get XYZ and pitch, yaw and roll
         rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
         proj_matrix = np.hstack((rotation_matrix, translation_vector))
-        x, y, z = self._getXYZ(proj_matrix)
-        self.x = x / self.width    #Scale down to be between 0 and 1
-        self.y = y / self.height   #Scale down to be between 0 and 1
-        self.z = z / 10000         #Scale down to be between 0 and 1
+        self.x, self.y, self.z = self._getXYZ(proj_matrix)
 
         self.pitch, self.yaw, self.roll = self._rotationMatrixToEulerAngles(rotation_matrix)
 
         # Translate pose into a torch tensor
-        self.pose = torch.tensor(np.hstack(([self.x, self.y, self.z], [self.pitch, self.yaw, self.roll])))
+        self.pose = torch.tensor(np.hstack(([self.x, self.y, self.z], [self.pitch, self.yaw, self.roll])), dtype=torch.float32)
 
     def _rotationMatrixToEulerAngles(self, R):
         # Calculation details at https://learnopencv.com/rotation-matrix-to-euler-angles/
@@ -237,6 +233,11 @@ class PoseEstimation:
         depth = camera_point_vector[2]
         camera_point_vector = camera_point_vector / depth
         camera_point_vector[2] = depth
+
+        #Scale coordinates match camera resolution
+        camera_point_vector[0] /= self.width    #Scale down to be between 0 and 1
+        camera_point_vector[1] /= self.height   #Scale down to be between 0 and 1
+        camera_point_vector[2] /= 10000         #Scale down to be between 0 and 1
 
         return camera_point_vector
 
