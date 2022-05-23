@@ -7,6 +7,7 @@ zlib
 test.py
 checkpoints
 UT Multi-view Gaze Dataset
+calibration_dataset
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -7,7 +7,7 @@ from torchvision import transforms
 from data_collector import DataCollector
 
 class Calibration:
-    def __init__(self, model = './garage/03.pth', model_colour = False, version = 2, fast=False, verbose=False):
+    def __init__(self, model = './garage/03.pth', model_colour = False, version = 2, fast=False, camera_resolution=10000, verbose=False):
         self.model = model
         self.model_colour = model_colour
         if model_colour:
@@ -21,7 +21,8 @@ class Calibration:
         self.pose = None
         self.label_list = None
         self.predicted_points = []
-        self.datacollector = DataCollector(calibration="calibration", fast=fast, model_colour=self.model_colour, version=version)
+        self.datacollector = DataCollector(calibration=True, fast=fast, model_colour=self.model_colour,
+                                            camera_resolution=camera_resolution, version=version, verbose=verbose)
         
         user32 = ctypes.windll.user32
         self.screenWidth, self.screenHeight = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)  # get monitor resolution
@@ -37,10 +38,14 @@ class Calibration:
 
     def Calibrate(self):
         dataset_dir = "./calibration_dataset/"
-        for file in glob.glob(dataset_dir):
-            os.remove(file)
-        self.Collect()
         file = "dataset_partx.pt"
+        if os.path.exists(dataset_dir):
+            if os.path.exists(dataset_dir+file):
+                os.remove(dataset_dir+file)
+        else:
+            os.mkdir(dataset_dir)
+
+        self.Collect()
         dataset = torch.load(os.path.join(dataset_dir, file))
         self.left_eye_images = dataset["left_eye"]
         self.right_eye_images = dataset["right_eye"]
@@ -66,11 +71,11 @@ class Calibration:
         ])
 
         if self.model_colour:
-            eye_left = img_transform(self.left_eye_image[index] / 255.0)
-            eye_right = img_transform(self.right_eye_image[index] / 255.0)
+            eye_left = img_transform(self.left_eye_images[index] / 255.0)
+            eye_right = img_transform(self.right_eye_images[index] / 255.0)
         else: 
-            eye_left = self.left_eye_image[index] / 255.0
-            eye_right = self.right_eye_image[index] / 255.0
+            eye_left = self.left_eye_images[index] / 255.0
+            eye_right = self.right_eye_images[index] / 255.0
 
         input = torch.cat((eye_left, eye_right), 0).unsqueeze(0).to(self.device)
 
