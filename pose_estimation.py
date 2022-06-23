@@ -22,7 +22,7 @@ class PoseEstimation:
                             (-177.0, 0.0, 0.0),          # Left eye right corner
                             (177.0, 0.0, 0.0),           # Right eye left corner
                             ])
-    FACE_POINTS_FAST = [4, 2, 0, 3, 1] # Facial landmark values for abovementioned points, as denoted by dlib
+    FACE_POINTS_FAST = [30, 36, 45, 39, 42] # Facial landmark values for abovementioned points, as denoted by dlib
 
     def __init__(self, frame, fast = False):
         self.x = None
@@ -36,6 +36,7 @@ class PoseEstimation:
         self.lines = None
         self.frame = frame
         self.pose = None
+        self.fast = fast
         if fast:
             self.model_points = self.MODEL_POINTS_FAST
             self.face_points = self.FACE_POINTS_FAST
@@ -175,9 +176,15 @@ class PoseEstimation:
 
         # Project 3 3D point onto the image plane.
         # We use this to draw 3 lines sticking out of the nose tip
-        axis = np.float32([[500, -170, 135],
-                           [0, 330, 135],
-                           [0, -170, 635]])
+        axis = []
+        if self.fast:
+            axis = np.float32([[500, -340, 393],
+                               [0, 160, 393],
+                               [0, -340, 893]])
+        else:
+            axis = np.float32([[500, -170, 135],
+                               [0, 330, 135],
+                               [0, -170, 635]])
         (nose_point_2D, jacobian) = cv2.projectPoints(axis, rotation_vector,
                                                          translation_vector, self.camera_matrix, dist_coeffs)
 
