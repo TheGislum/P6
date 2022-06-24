@@ -22,7 +22,7 @@ class PoseEstimation:
                             (-177.0, 0.0, 0.0),          # Left eye right corner
                             (177.0, 0.0, 0.0),           # Right eye left corner
                             ])
-    FACE_POINTS_FAST = [30, 36, 45, 39, 42] # Facial landmark values for abovementioned points, as denoted by dlib
+    FACE_POINTS_FAST = [4, 2, 0, 3, 1] # Facial landmark values for abovementioned points, as denoted by dlib
 
     def __init__(self, frame, fast = False):
         self.x = None

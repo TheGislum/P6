@@ -1,5 +1,5 @@
 import cv2
-from face_tracking import FaceTracking
+from face_tracking import FaceTracking, FastFaceTracking
 from pose_estimation import PoseEstimation
 from eye_isolation import EyeIsolation
 
@@ -8,7 +8,7 @@ webcam.set(cv2.CAP_PROP_FRAME_WIDTH, 10000)     #Set resolution to impossibly hi
 webcam.set(cv2.CAP_PROP_FRAME_HEIGHT, 10000)
 ret, img = webcam.read()
 
-face = FaceTracking()
+face = FastFaceTracking()
 pose = PoseEstimation(img, True)
 
 while True:
@@ -16,7 +16,7 @@ while True:
     ret, frame = webcam.read()
     if ret == True:
         if face.refresh(frame):
-            pose.refresh(frame, face.lastXLandmarksAverage)
+            pose.refresh(frame, face.landmarks)
             eye_left = EyeIsolation(frame, pose.face_landmarks, 0, (50, 30))
             eye_right = EyeIsolation(frame, pose.face_landmarks, 1, (50, 30))
             cv2.imshow("eye_left", eye_left.colour_frame)
